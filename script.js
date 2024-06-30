@@ -40,11 +40,16 @@ let mouseX;
 let mouseY;
 
 let lastFetch = 0;
+let clipboardText = "";
 let clipboardItems = [];
 
 let bubbleRadiusMin = 10;
 let bubbleRadiusMax = 35;
 let bubbleRadius = bubbleRadiusMin;
+let newBubbleRadius = null;
+let newBubbleRadiusTime = null;
+let newBubbleRadiusBefore = null;
+let bubbleAnimTime = 750;
 
 document.addEventListener("mousemove", async (e) => {
   mouseX = e.clientX;
@@ -63,12 +68,57 @@ document.addEventListener("keydown", async (e) => {
 function update() {
   // TODO: improve update function, this is just an example
   spinDeg += 0.5;
+  if (newBubbleRadius) {
+    const t =
+      Math.min(Date.now() - newBubbleRadiusTime, bubbleAnimTime) /
+      bubbleAnimTime;
+    // these did not work well
+    // const progression = Math.pow(t, 2) * (3 - 2 * t);
+    // const progression =
+    //   3 * (1 - t) * Math.pow(t, 2) * 0.58 + Math.pow(t, 3) * 1;
+    // const progression = cubicBezier(t, 0, 0, 0.58, 1);
+    // const progression = cubicBezier(t, 0.11, 0.71, 0.5, 1);
+    // const progression = cubicBezier(t, 0, 1, 0, 1);
+    const progression =
+      t < 0.5 ? 4 * Math.pow(t, 3) : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    console.log(progression);
+    bubbleRadius = Math.min(
+      newBubbleRadiusBefore +
+        (newBubbleRadius - newBubbleRadiusBefore) * progression,
+      newBubbleRadius
+    );
+    if (bubbleRadius === newBubbleRadius) {
+      newBubbleRadiusBefore = null;
+      newBubbleRadiusTime = null;
+      newBubbleRadius = null;
+    }
+  }
 }
+
+// function cubicBezier(t, p0, p1, p2, p3) {
+//   return (
+//     Math.pow(1 - t, 3) * p0 +
+//     3 * Math.pow(1 - t, 2) * t * p1 +
+//     3 * (1 - t) * Math.pow(t, 2) * p2 +
+//     Math.pow(t, 3) * p3
+//   );
+// }
+
+// function cubicBezier(t, initial, p1, p2, final) {
+//   return (
+//     (1 - t) * (1 - t) * (1 - t) * initial +
+//     3 * (1 - t) * (1 - t) * t * p1 +
+//     3 * (1 - t) * t * t * p2 +
+//     t * t * t * final
+//   );
+// }
 
 function draw() {
   ctx.save();
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const currDate = Date.now();
 
   const petShape = images[petShapes[1]];
   const eyesBack = images.eyes_back;
@@ -147,14 +197,14 @@ function draw() {
   ctx.fill();
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "bold 15px sans-serif";
+  ctx.font = "bold 13px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (const char of clipboardItems) {
+    if (char.appearAt > currDate) ctx.globalAlpha = 0;
+    else ctx.globalAlpha = Math.min((currDate - char.appearAt) / 200, 1) * 0.9;
     const offsetX = char.distance * Math.cos(char.angleRad);
     const offsetY = char.distance * Math.sin(char.angleRad);
-    console.log(offsetX);
-    console.log(offsetY);
     ctx.fillText(char.char, mouseX + offsetX, mouseY + offsetY);
   }
 
@@ -165,15 +215,23 @@ function draw() {
 
 async function fetchClipboard() {
   lastFetch = Date.now();
-  const items = ((await navigator.clipboard.readText()) ?? "")
-    .split("")
-    .filter((char) => char)
-    .map((char) => ({
-      char,
-      angleRad: getRandomArbitrary(0, 360) * (180 / Math.PI),
-      distance: getRandomArbitrary(0, bubbleRadius - 5),
-    }));
-  return items;
+  const oldClipboardText = clipboardText;
+  clipboardText = (await navigator.clipboard.readText()) ?? "";
+  if (clipboardText !== oldClipboardText) {
+    const newItems = clipboardText.split("").filter((char) => char);
+    if (newItems.length >= 1) {
+      newBubbleRadiusBefore = bubbleRadius;
+      newBubbleRadiusTime = Date.now();
+      newBubbleRadius = Math.min(25 + newItems.length / 10, 200);
+    }
+    clipboardItems = newItems.map((char) => {
+      const angleRad = getRandomArbitrary(0, 360) * (180 / Math.PI);
+      const distance = getRandomArbitrary(0, newBubbleRadius * 0.8);
+      const appearAt =
+        Date.now() + bubbleAnimTime * (distance / (bubbleRadius * 0.8));
+      return { char, angleRad, distance, appearAt };
+    });
+  }
 }
 
 function getRandomArbitrary(min, max) {
