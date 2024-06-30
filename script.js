@@ -8,6 +8,9 @@ const images = {
   polygon: { image: null, imageRatio: null },
   rectangle: { image: null, imageRatio: null },
   star: { image: null, imageRatio: null },
+  eyes_back: { image: null, imageRatio: null },
+  eyes_front: { image: null, imageRatio: null },
+  mouth: { image: null, imageRatio: null },
 };
 
 const petShapes = ["ellipse", "polygon", "rectangle", "star"];
@@ -23,7 +26,7 @@ for (const imageKey in images) {
       imageObj.image = image;
       imageObj.imageRatio = image.height / image.width;
       loadedCount++;
-      if (loadedCount === petShapes.length) start();
+      if (loadedCount === Object.keys(images).length) start();
     },
     { once: true }
   );
@@ -31,15 +34,57 @@ for (const imageKey in images) {
 }
 
 function start() {
-  const drawWidth = 200;
   const petShape = images[petShapes[1]];
+  const eyesBack = images.eyes_back;
+  const eyesFront = images.eyes_front;
+  const mouth = images.mouth;
+
+  const petSizeWidth = 200;
+  const petSizeHeight = petShape.imageRatio * petSizeWidth;
+  const petX = 50;
+  const petY = 50;
+
+  const eyesBackWidth = petSizeWidth / 2.7;
+  const eyesBackHeight = eyesBack.imageRatio * eyesBackWidth;
+  const eyesBackX = petX + petSizeWidth / 2 - eyesBackWidth / 2;
+  const eyesBackY = petY + petSizeHeight / 2.3 - eyesBackHeight / 2;
+
+  const radius = 5;
+  const eyeAngle = 225;
+  const eyeOffsetX = radius * Math.cos((Math.PI / 180) * eyeAngle);
+  const eyeOffsetY = radius * Math.sin((Math.PI / 180) * eyeAngle);
+
+  const eyesFrontWidth = eyesBackWidth;
+  const eyesFrontHeight = eyesFront.imageRatio * eyesFrontWidth;
+  const eyesFrontX = eyesBackX + eyeOffsetX;
+  const eyesFrontY = eyesBackY + eyeOffsetY;
+  // const eyesFrontX = eyesBackX - 3;
+  // const eyesFrontY = eyesBackY - 3;
+
+  const mouthWidth = petSizeWidth / 13;
+  const mouthHeight = mouth.imageRatio * mouthWidth;
+  const mouthX = eyesBackX + eyesBackWidth / 2 - mouthWidth / 2;
+  const mouthY = eyesBackY + 42;
+
+  ctx.drawImage(petShape.image, petX, petY, petSizeWidth, petSizeHeight);
+
   ctx.drawImage(
-    petShape.image,
-    50,
-    50,
-    drawWidth,
-    petShape.imageRatio * drawWidth
+    eyesBack.image,
+    eyesBackX,
+    eyesBackY,
+    eyesBackWidth,
+    eyesBackHeight
   );
+
+  ctx.drawImage(
+    eyesFront.image,
+    eyesFrontX,
+    eyesFrontY,
+    eyesFrontWidth,
+    eyesFrontHeight
+  );
+
+  ctx.drawImage(mouth.image, mouthX, mouthY, mouthWidth, mouthHeight);
 }
 
 function resizeCanvas() {
@@ -50,15 +95,3 @@ function resizeCanvas() {
 window.addEventListener("resize", resizeCanvas);
 
 resizeCanvas();
-
-// img.addEventListener(
-//   "load",
-//   () => {
-//     const ratio = img.height / img.width;
-//     const drawWidth = 250;
-//     ctx.drawImage(img, 50, 50, drawWidth, ratio * drawWidth);
-//   },
-//   { once: true }
-// );
-
-// img.src = `pet_components/${petShapes[1]}.svg`;
