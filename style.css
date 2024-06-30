@@ -1,0 +1,6 @@
+body {
+  margin: 0;
+  overflow: hidden;
+  display: flow-root;
+  background-color: rgb(140, 120, 120);
+}
