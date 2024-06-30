@@ -2,5 +2,10 @@ body {
   margin: 0;
   overflow: hidden;
   display: flow-root;
-  background-color: rgb(140, 120, 120);
+  background-color: rgb(0 0 0);
+}
+
+#primaryCanvas {
+  filter: drop-shadow(0 0 15px rgb(255 255 255 / 0.2))
+    drop-shadow(0 0 80px rgb(255 255 255 / 0.5));
 }
