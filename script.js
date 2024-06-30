@@ -39,9 +39,25 @@ for (const imageKey in images) {
 let mouseX;
 let mouseY;
 
-document.addEventListener("mousemove", (e) => {
+let lastFetch = 0;
+let clipboardItems = [];
+
+let bubbleRadiusMin = 10;
+let bubbleRadiusMax = 35;
+let bubbleRadius = bubbleRadiusMin;
+
+document.addEventListener("mousemove", async (e) => {
   mouseX = e.clientX;
   mouseY = e.clientY;
+  if (lastFetch + 5000 < Date.now()) await fetchClipboard();
+});
+
+document.addEventListener("keydown", async (e) => {
+  if (e.key === "v" && (e.ctrlkey || e.metaKey)) {
+    e.preventDefault();
+    await fetchClipboard();
+    await navigator.clipboard.writeText("");
+  }
 });
 
 function update() {
@@ -97,6 +113,8 @@ function draw() {
   const mouthX = eyesBackX + eyesBackWidth / 2 - mouthWidth / 2;
   const mouthY = eyesBackY + 42;
 
+  ctx.save();
+
   ctx.translate(petCenterX, petCenterY);
   ctx.rotate(spinRad);
   ctx.translate(-petCenterX, -petCenterY);
@@ -123,7 +141,43 @@ function draw() {
 
   ctx.restore();
 
+  ctx.beginPath();
+  ctx.arc(mouseX, mouseY, bubbleRadius, 0, 2 * Math.PI, false);
+  ctx.fillStyle = "rgb(50 50 50)";
+  ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 15px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const char of clipboardItems) {
+    const offsetX = char.distance * Math.cos(char.angleRad);
+    const offsetY = char.distance * Math.sin(char.angleRad);
+    console.log(offsetX);
+    console.log(offsetY);
+    ctx.fillText(char.char, mouseX + offsetX, mouseY + offsetY);
+  }
+
+  ctx.restore();
+
   window.requestAnimationFrame(draw);
+}
+
+async function fetchClipboard() {
+  lastFetch = Date.now();
+  const items = ((await navigator.clipboard.readText()) ?? "")
+    .split("")
+    .filter((char) => char)
+    .map((char) => ({
+      char,
+      angleRad: getRandomArbitrary(0, 360) * (180 / Math.PI),
+      distance: getRandomArbitrary(0, bubbleRadius - 5),
+    }));
+  return items;
+}
+
+function getRandomArbitrary(min, max) {
+  return Math.random() * (max - min) + min;
 }
 
 function resizeCanvas() {
