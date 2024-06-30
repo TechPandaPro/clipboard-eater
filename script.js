@@ -43,8 +43,10 @@ let lastFetch = 0;
 let clipboardText = "";
 let clipboardItems = [];
 
+const toEat = [];
+
 let bubbleRadiusMin = 10;
-let bubbleRadiusMax = 35;
+let bubbleRadiusMax = 300;
 let bubbleRadius = bubbleRadiusMin;
 let newBubbleRadius = null;
 let newBubbleRadiusTime = null;
@@ -54,7 +56,7 @@ let bubbleAnimTime = 750;
 document.addEventListener("mousemove", async (e) => {
   mouseX = e.clientX;
   mouseY = e.clientY;
-  if (lastFetch + 5000 < Date.now()) await fetchClipboard();
+  if (lastFetch + 500 < Date.now()) await fetchClipboard();
 });
 
 document.addEventListener("keydown", async (e) => {
@@ -62,6 +64,24 @@ document.addEventListener("keydown", async (e) => {
     e.preventDefault();
     await fetchClipboard();
     await navigator.clipboard.writeText("");
+
+    toEat.push(
+      ...clipboardItems.map((item) => ({
+        char: item.char,
+        angleRad: item.angleRad,
+        x: mouseX + item.distance * Math.cos(item.angleRad),
+        y: mouseY + item.distance * Math.sin(item.angleRad),
+        rotation: item.rotation,
+        rotationChange: item.rotationChange,
+        spinOffset: item.spinOffset,
+      }))
+    );
+
+    clipboardItems = [];
+
+    newBubbleRadius = bubbleRadiusMin;
+    newBubbleRadiusTime = Date.now();
+    newBubbleRadiusBefore = bubbleRadius;
   }
 });
 
@@ -72,46 +92,25 @@ function update() {
     const t =
       Math.min(Date.now() - newBubbleRadiusTime, bubbleAnimTime) /
       bubbleAnimTime;
-    // these did not work well
-    // const progression = Math.pow(t, 2) * (3 - 2 * t);
-    // const progression =
-    //   3 * (1 - t) * Math.pow(t, 2) * 0.58 + Math.pow(t, 3) * 1;
-    // const progression = cubicBezier(t, 0, 0, 0.58, 1);
-    // const progression = cubicBezier(t, 0.11, 0.71, 0.5, 1);
-    // const progression = cubicBezier(t, 0, 1, 0, 1);
     const progression =
       t < 0.5 ? 4 * Math.pow(t, 3) : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    console.log(progression);
-    bubbleRadius = Math.min(
+    bubbleRadius =
       newBubbleRadiusBefore +
-        (newBubbleRadius - newBubbleRadiusBefore) * progression,
-      newBubbleRadius
-    );
+      (newBubbleRadius - newBubbleRadiusBefore) * progression;
+    if (newBubbleRadius > newBubbleRadiusBefore)
+      bubbleRadius = Math.min(bubbleRadius, newBubbleRadius);
+    else bubbleRadius = Math.max(bubbleRadius, newBubbleRadius);
     if (bubbleRadius === newBubbleRadius) {
       newBubbleRadiusBefore = null;
       newBubbleRadiusTime = null;
       newBubbleRadius = null;
     }
   }
+  clipboardItems.map((item) => {
+    item.angleRad += item.orbitChange;
+    item.rotation += item.rotationChange;
+  });
 }
-
-// function cubicBezier(t, p0, p1, p2, p3) {
-//   return (
-//     Math.pow(1 - t, 3) * p0 +
-//     3 * Math.pow(1 - t, 2) * t * p1 +
-//     3 * (1 - t) * Math.pow(t, 2) * p2 +
-//     Math.pow(t, 3) * p3
-//   );
-// }
-
-// function cubicBezier(t, initial, p1, p2, final) {
-//   return (
-//     (1 - t) * (1 - t) * (1 - t) * initial +
-//     3 * (1 - t) * (1 - t) * t * p1 +
-//     3 * (1 - t) * t * t * p2 +
-//     t * t * t * final
-//   );
-// }
 
 function draw() {
   ctx.save();
@@ -191,6 +190,17 @@ function draw() {
 
   ctx.restore();
 
+  ctx.save();
+
+  const shakeIntensity =
+    (Math.max(bubbleRadius - bubbleRadiusMax * 0.3, 0) /
+      (bubbleRadiusMax * 0.3)) *
+    5;
+  ctx.translate(
+    getRandomArbitrary(-shakeIntensity, shakeIntensity),
+    getRandomArbitrary(-shakeIntensity, shakeIntensity)
+  );
+
   ctx.beginPath();
   ctx.arc(mouseX, mouseY, bubbleRadius, 0, 2 * Math.PI, false);
   ctx.fillStyle = "rgb(50 50 50)";
@@ -202,11 +212,44 @@ function draw() {
   ctx.textBaseline = "middle";
   for (const char of clipboardItems) {
     if (char.appearAt > currDate) ctx.globalAlpha = 0;
-    else ctx.globalAlpha = Math.min((currDate - char.appearAt) / 200, 1) * 0.9;
+    else ctx.globalAlpha = Math.min((currDate - char.appearAt) / 200, 1) * 0.5;
+
     const offsetX = char.distance * Math.cos(char.angleRad);
     const offsetY = char.distance * Math.sin(char.angleRad);
-    ctx.fillText(char.char, mouseX + offsetX, mouseY + offsetY);
+
+    const textX = mouseX + offsetX;
+    const textY = mouseY + offsetY;
+
+    if (char.rotation !== 0) {
+      ctx.save();
+
+      ctx.translate(textX + char.spinOffset, textY + char.spinOffset);
+      ctx.rotate(char.rotation);
+      ctx.translate(-(textX + char.spinOffset), -(textY + char.spinOffset));
+    }
+
+    ctx.fillText(char.char, textX, textY);
+
+    if (char.rotation !== 0) ctx.restore();
   }
+
+  ctx.globalAlpha = 0.5;
+
+  for (const char of toEat) {
+    if (char.rotation !== 0) {
+      ctx.save();
+
+      ctx.translate(char.x + char.spinOffset, char.y + char.spinOffset);
+      ctx.rotate(char.rotation);
+      ctx.translate(-(char.x + char.spinOffset), -(char.y + char.spinOffset));
+    }
+
+    ctx.fillText(char.char, char.x, char.y);
+
+    if (char.rotation !== 0) ctx.restore();
+  }
+
+  ctx.restore();
 
   ctx.restore();
 
@@ -215,23 +258,51 @@ function draw() {
 
 async function fetchClipboard() {
   lastFetch = Date.now();
-  const oldClipboardText = clipboardText;
-  clipboardText = (await navigator.clipboard.readText()) ?? "";
-  if (clipboardText !== oldClipboardText) {
-    const newItems = clipboardText.split("").filter((char) => char);
+  const newClipboardText = (await navigator.clipboard.readText()) ?? "";
+  if (clipboardText !== newClipboardText) {
+    clipboardText = newClipboardText;
+    const newItems = clipboardText.split("").filter((char) => char.trim());
     if (newItems.length >= 1) {
       newBubbleRadiusBefore = bubbleRadius;
       newBubbleRadiusTime = Date.now();
-      newBubbleRadius = Math.min(25 + newItems.length / 10, 200);
+      newBubbleRadius = Math.min(25 + newItems.length / 10, bubbleRadiusMax);
     }
+    let totalSpinning = 0;
     clipboardItems = newItems.map((char) => {
       const angleRad = getRandomArbitrary(0, 360) * (180 / Math.PI);
-      const distance = getRandomArbitrary(0, newBubbleRadius * 0.8);
+      const distance = getRandomArbitrary(0, newBubbleRadius * 0.95 - 7);
       const appearAt =
-        Date.now() + bubbleAnimTime * (distance / (bubbleRadius * 0.8));
-      return { char, angleRad, distance, appearAt };
+        Date.now() +
+        (bubbleAnimTime / 1.2) * (distance / (newBubbleRadius * 0.95 - 7)) -
+        getRandomInt(0, 200);
+      const orbitChange = getRandomArbitrary(-0.5, 0.5) * (Math.PI / 180);
+      let rotationChange = 0;
+      if (totalSpinning < 200) {
+        rotationChange = getRandomArbitrary(-1, 1) * (Math.PI / 180);
+        totalSpinning++;
+      }
+      const spinOffset = getRandomInt(-10, 10);
+      return {
+        char,
+        angleRad,
+        distance,
+        appearAt,
+        orbitChange,
+        rotation: 0,
+        rotationChange,
+        spinOffset,
+      };
     });
   }
+}
+
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+
+// min and max are inclusive
+function getRandomInt(min, max) {
+  const minCeiled = Math.ceil(min);
+  const maxFloored = Math.floor(max);
+  return Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled);
 }
 
 function getRandomArbitrary(min, max) {
