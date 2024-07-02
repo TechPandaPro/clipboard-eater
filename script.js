@@ -45,6 +45,8 @@ for (const imageKey in images) {
 let mouseX;
 let mouseY;
 
+let mouthWidth;
+let mouthHeight;
 let mouthX;
 let mouthY;
 
@@ -53,6 +55,7 @@ let clipboardText = "";
 let clipboardItems = [];
 
 const toEat = [];
+let toEatSince = null;
 
 let bubbleRadiusMin = 10;
 let bubbleRadiusMax = 300;
@@ -74,6 +77,8 @@ document.addEventListener("keydown", async (e) => {
     await fetchClipboard();
     await navigator.clipboard.writeText("");
 
+    toEatSince = Date.now();
+
     toEat.push(
       ...clipboardItems.map((item) => ({
         char: item.char,
@@ -84,6 +89,8 @@ document.addEventListener("keydown", async (e) => {
         rotationChange: item.rotationChange,
         spinOffset: item.spinOffset,
         speed: getRandomArbitrary(4, 5),
+        alpha: 1,
+        remove: false,
       }))
     );
 
@@ -122,13 +129,16 @@ function update() {
     item.rotation += item.rotationChange;
   });
 
+  const fixedMouthX = mouthX + mouthWidth / 2;
+  const fixedMouthY = mouthY + (mouthHeight * 4) / 1.5;
+
   for (const char of toEat) {
     if (
       getRandomInt(0, 10) === 0 ||
       !("cachedChangeX" in char) ||
       !("cachedChangeY" in char)
     ) {
-      const direction = Math.atan2(char.y - mouthY, char.x - mouthX);
+      const direction = Math.atan2(char.y - fixedMouthY, char.x - fixedMouthX);
       char.cachedChangeX = Math.cos(direction) * -char.speed;
       char.cachedChangeY = Math.sin(direction) * -char.speed;
     }
@@ -137,11 +147,24 @@ function update() {
     char.y += char.cachedChangeY;
   }
 
-  const removeToEat = toEat.filter(
-    (char) => Math.abs(char.x - mouthX) < 10 && Math.abs(char.y - mouthY) < 10
-  );
+  const removeToEat = toEat
+    .filter(
+      (char) =>
+        char.remove ||
+        (Math.abs(char.x - fixedMouthX) < 10 &&
+          Math.abs(char.y - fixedMouthY) < 10)
+    )
+    .map((remove) => {
+      remove.remove = true;
+      remove.alpha = Math.max(remove.alpha - 0.07, 0);
+      return remove;
+    });
 
-  for (const remove of removeToEat) toEat.splice(toEat.indexOf(remove), 1);
+  for (const remove of removeToEat) {
+    if (remove.alpha <= 0) toEat.splice(toEat.indexOf(remove), 1);
+  }
+
+  if (removeToEat.length >= 1 && toEat.length === 0) toEatSince = Date.now();
 
   petShapeAteCount += removeToEat.length;
 
@@ -199,8 +222,8 @@ function draw() {
   const eyesFrontX = eyesBackX + eyeOffsetX;
   const eyesFrontY = eyesBackY + eyeOffsetY;
 
-  const mouthWidth = petSizeWidth / 13;
-  const mouthHeight = mouth.imageRatio * mouthWidth;
+  mouthWidth = petSizeWidth / 13;
+  mouthHeight = mouth.imageRatio * mouthWidth;
   mouthX = eyesBackX + eyesBackWidth / 2 - mouthWidth / 2;
   mouthY = eyesBackY + 42;
 
@@ -237,7 +260,15 @@ function draw() {
     eyesFrontHeight
   );
 
+  ctx.save();
+  ctx.translate(mouthX + mouthWidth / 2, mouthY);
+  let ratio;
+  ratio = Math.min((Date.now() - toEatSince) / 150, 1);
+  if (toEat.length === 0) ratio = 1 - ratio;
+  ctx.scale(1 + 5 * ratio, 1 + 3 * ratio);
+  ctx.translate(-(mouthX + mouthWidth / 2), -mouthY);
   ctx.drawImage(mouth.image, mouthX, mouthY, mouthWidth, mouthHeight);
+  ctx.restore();
 
   ctx.restore();
 
@@ -284,8 +315,6 @@ function draw() {
     if (char.rotation !== 0) ctx.restore();
   }
 
-  ctx.globalAlpha = 0.5;
-
   for (const char of toEat) {
     if (char.rotation !== 0) {
       ctx.save();
@@ -294,6 +323,8 @@ function draw() {
       ctx.rotate(char.rotation);
       ctx.translate(-(char.x + char.spinOffset), -(char.y + char.spinOffset));
     }
+
+    ctx.globalAlpha = 0.5 * char.alpha;
 
     ctx.fillText(char.char, char.x, char.y);
 
