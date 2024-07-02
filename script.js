@@ -15,6 +15,12 @@ const images = {
 
 const petShapes = ["ellipse", "polygon", "rectangle", "star"];
 
+let petShapeNum = 0;
+let petShapeAteCount = 0;
+let petShapeBaseMax = 150;
+let petShapeAteMax = petShapeBaseMax;
+let hueRotate = 0;
+
 let loadedCount = 0;
 
 for (const imageKey in images) {
@@ -38,6 +44,9 @@ for (const imageKey in images) {
 
 let mouseX;
 let mouseY;
+
+let mouthX;
+let mouthY;
 
 let lastFetch = 0;
 let clipboardText = "";
@@ -74,6 +83,7 @@ document.addEventListener("keydown", async (e) => {
         rotation: item.rotation,
         rotationChange: item.rotationChange,
         spinOffset: item.spinOffset,
+        speed: getRandomArbitrary(4, 5),
       }))
     );
 
@@ -88,6 +98,7 @@ document.addEventListener("keydown", async (e) => {
 function update() {
   // TODO: improve update function, this is just an example
   spinDeg += 0.5;
+
   if (newBubbleRadius) {
     const t =
       Math.min(Date.now() - newBubbleRadiusTime, bubbleAnimTime) /
@@ -110,6 +121,37 @@ function update() {
     item.angleRad += item.orbitChange;
     item.rotation += item.rotationChange;
   });
+
+  for (const char of toEat) {
+    if (
+      getRandomInt(0, 10) === 0 ||
+      !("cachedChangeX" in char) ||
+      !("cachedChangeY" in char)
+    ) {
+      const direction = Math.atan2(char.y - mouthY, char.x - mouthX);
+      char.cachedChangeX = Math.cos(direction) * -char.speed;
+      char.cachedChangeY = Math.sin(direction) * -char.speed;
+    }
+
+    char.x += char.cachedChangeX;
+    char.y += char.cachedChangeY;
+  }
+
+  const removeToEat = toEat.filter(
+    (char) => Math.abs(char.x - mouthX) < 10 && Math.abs(char.y - mouthY) < 10
+  );
+
+  for (const remove of removeToEat) toEat.splice(toEat.indexOf(remove), 1);
+
+  petShapeAteCount += removeToEat.length;
+
+  if (petShapeAteCount >= petShapeAteMax) {
+    petShapeNum = getRandomInt(0, petShapes.length - 1);
+    petShapeAteMax +=
+      petShapeAteCount - petShapeAteMax + petShapeAteCount * 0.05;
+    petShapeAteCount = 0;
+    hueRotate = getRandomInt(0, 359);
+  }
 }
 
 function draw() {
@@ -119,7 +161,7 @@ function draw() {
 
   const currDate = Date.now();
 
-  const petShape = images[petShapes[1]];
+  const petShape = images[petShapes[petShapeNum]];
   const eyesBack = images.eyes_back;
   const eyesFront = images.eyes_front;
   const mouth = images.mouth;
@@ -159,16 +201,25 @@ function draw() {
 
   const mouthWidth = petSizeWidth / 13;
   const mouthHeight = mouth.imageRatio * mouthWidth;
-  const mouthX = eyesBackX + eyesBackWidth / 2 - mouthWidth / 2;
-  const mouthY = eyesBackY + 42;
+  mouthX = eyesBackX + eyesBackWidth / 2 - mouthWidth / 2;
+  mouthY = eyesBackY + 42;
 
   ctx.save();
 
+  const scale = 1 + Math.log(petShapeAteMax - petShapeBaseMax + 1) / 25;
+  console.log(scale);
+
   ctx.translate(petCenterX, petCenterY);
+  ctx.scale(scale, scale);
   ctx.rotate(spinRad);
   ctx.translate(-petCenterX, -petCenterY);
 
+  ctx.save();
+  ctx.filter = `hue-rotate(${hueRotate}deg) brightness(${
+    (petShapeAteCount / petShapeAteMax) * 200 + 100
+  }%)`;
   ctx.drawImage(petShape.image, petX, petY, petSizeWidth, petSizeHeight);
+  ctx.restore();
 
   ctx.drawImage(
     eyesBack.image,
