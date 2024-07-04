@@ -1,7 +1,22 @@
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
-let spinDeg = 0;
+// FIXME: remove
+// let spinDeg = 0;
+
+let petX = document.body.offsetWidth / 2;
+let petY = document.body.offsetHeight / 2;
+
+let petMoveAngle = 0;
+let petMoveDistance = 0;
+
+const petMoveDistanceMax = 1;
+
+let lastPetMoveAccStamp = Date.now();
+let petMoveAngleVel = 0;
+let petMoveAngleAcc = 0;
+let petMoveDistanceVel = 0;
+let petMoveDistanceAcc = 0;
 
 const images = {
   ellipse: { image: null, imageRatio: null },
@@ -104,7 +119,40 @@ document.addEventListener("keydown", async (e) => {
 
 function update() {
   // TODO: improve update function, this is just an example
-  spinDeg += 0.5;
+  // TODO: delete
+  // spinDeg += 0.5;
+
+  // lastPetMoveAccStamp;
+  // petMoveAngleVel;
+  // petMoveAngleAcc;
+  // petMoveDistanceVel;
+  // petMoveDistanceAcc;
+
+  if (lastPetMoveAccStamp + 5000 >= Date.now()) {
+    lastPetMoveAccStamp = Date.now();
+    petMoveAngleAcc = getRandomArbitrary(-0.1, 0.1);
+    petMoveDistanceAcc = getRandomArbitrary(-0.1, 0.1);
+  }
+
+  petMoveAngleVel += petMoveAngleAcc;
+  petMoveDistanceVel += petMoveDistanceAcc;
+
+  // petMoveAngle += petMoveAngleVel;
+  // petMoveDistance += Math.min(
+  //   petMoveDistance + petMoveDistanceVel,
+  //   petMoveDistanceMax
+  // );
+
+  petMoveAngle += petMoveAngleAcc;
+  petMoveDistance += Math.min(
+    petMoveDistance + petMoveDistanceAcc,
+    petMoveDistanceMax
+  );
+
+  const petMoveRad = petMoveAngle * (Math.PI / 180);
+
+  petX += petMoveDistance * Math.cos(petMoveRad);
+  petY += petMoveDistance * Math.sin(petMoveRad);
 
   if (newBubbleRadius) {
     const t =
@@ -189,12 +237,15 @@ function draw() {
   const eyesFront = images.eyes_front;
   const mouth = images.mouth;
 
-  const spinRad = spinDeg * (Math.PI / 180);
+  // FIXME: remove
+  // const spinRad = spinDeg * (Math.PI / 180);
+  const spinRad = petMoveAngle * (Math.PI / 180);
 
   const petSizeWidth = 200;
   const petSizeHeight = petShape.imageRatio * petSizeWidth;
-  const petX = 50;
-  const petY = 50;
+  // FIXME: remove
+  // const petX = 50;
+  // const petY = 50;
 
   const petCenterX = petX + petSizeWidth / 2;
   const petCenterY = petY + petSizeHeight / 2;
@@ -230,7 +281,6 @@ function draw() {
   ctx.save();
 
   const scale = 1 + Math.log(petShapeAteMax - petShapeBaseMax + 1) / 25;
-  console.log(scale);
 
   ctx.translate(petCenterX, petCenterY);
   ctx.scale(scale, scale);
