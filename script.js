@@ -7,16 +7,19 @@ const ctx = canvas.getContext("2d");
 let petX = document.body.offsetWidth / 2;
 let petY = document.body.offsetHeight / 2;
 
-let petMoveAngle = 0;
-let petMoveDistance = 0;
+const petSizeWidth = 200;
 
-const petMoveDistanceMax = 1;
-
-let lastPetMoveAccStamp = Date.now();
+let nextPetMoveAccStamp = Date.now();
 let petMoveAngleVel = 0;
 let petMoveAngleAcc = 0;
 let petMoveDistanceVel = 0;
 let petMoveDistanceAcc = 0;
+
+let petMoveAngle = 0;
+let petMoveDistance = 0;
+
+const petMoveAngleVelMax = 0.2;
+const petMoveDistanceVelMax = 0.01;
 
 const images = {
   ellipse: { image: null, imageRatio: null },
@@ -128,14 +131,20 @@ function update() {
   // petMoveDistanceVel;
   // petMoveDistanceAcc;
 
-  if (lastPetMoveAccStamp + 5000 >= Date.now()) {
-    lastPetMoveAccStamp = Date.now();
-    petMoveAngleAcc = getRandomArbitrary(-0.1, 0.1);
-    petMoveDistanceAcc = getRandomArbitrary(-0.1, 0.1);
+  if (nextPetMoveAccStamp <= Date.now()) {
+    nextPetMoveAccStamp = Date.now() + 5000;
+    petMoveAngleAcc = getRandomArbitrary(-0.4, 0.4);
+    petMoveDistanceAcc = getRandomArbitrary(0, 0.3);
   }
 
-  petMoveAngleVel += petMoveAngleAcc;
-  petMoveDistanceVel += petMoveDistanceAcc;
+  petMoveAngleVel = Math.max(
+    Math.min(petMoveAngleVel + petMoveAngleAcc, petMoveAngleVelMax),
+    -petMoveAngleVelMax
+  );
+  petMoveDistanceVel = Math.min(
+    petMoveDistanceVel + petMoveDistanceAcc,
+    petMoveDistanceVelMax
+  );
 
   // petMoveAngle += petMoveAngleVel;
   // petMoveDistance += Math.min(
@@ -143,16 +152,51 @@ function update() {
   //   petMoveDistanceMax
   // );
 
-  petMoveAngle += petMoveAngleAcc;
-  petMoveDistance += Math.min(
-    petMoveDistance + petMoveDistanceAcc,
-    petMoveDistanceMax
-  );
+  petMoveAngle += petMoveAngleVel;
+  petMoveDistance += petMoveDistanceVel;
+  // petMoveDistance = 1;
 
   const petMoveRad = petMoveAngle * (Math.PI / 180);
 
   petX += petMoveDistance * Math.cos(petMoveRad);
   petY += petMoveDistance * Math.sin(petMoveRad);
+
+  const petShape = images[petShapes[petShapeNum]];
+  const petSizeHeight = petShape.imageRatio * petSizeWidth;
+
+  const scale = getPetScale();
+
+  const widthLargerBy = petSizeWidth * (scale - 1);
+  const heightLargerBy = petSizeHeight * (scale - 1);
+
+  const leftBoundary = widthLargerBy / 2;
+  const rightBoundary = canvas.width - petSizeWidth - widthLargerBy / 2;
+  const topBoundary = heightLargerBy / 2;
+  const bottomBoundary = canvas.height - petSizeHeight - heightLargerBy / 2;
+
+  const oldPetX = petX;
+  const oldPetY = petY;
+
+  petX = Math.max(Math.min(petX, rightBoundary), leftBoundary);
+  petY = Math.max(Math.min(petY, bottomBoundary), topBoundary);
+
+  if (Math.round(oldPetX) !== Math.round(petX)) console.log({ oldPetX, petX });
+  if (Math.round(oldPetY) !== Math.round(petY)) console.log({ oldPetY, petY });
+
+  // if (
+  //   Math.round(oldPetX) !== Math.round(petX) ||
+  //   Math.round(oldPetY) !== Math.round(petY)
+  // ) {
+  if (oldPetX !== petX || oldPetY !== petY) {
+    // petMoveAngleAcc *= -1;
+    petMoveAngleAcc += 180;
+
+    petMoveAngleVel = 0;
+    petMoveDistanceVel = 0;
+
+    // petMoveAngle = 0;
+    petMoveDistance = 0;
+  }
 
   if (newBubbleRadius) {
     const t =
@@ -199,8 +243,8 @@ function update() {
     .filter(
       (char) =>
         char.remove ||
-        (Math.abs(char.x - fixedMouthX) < 10 &&
-          Math.abs(char.y - fixedMouthY) < 10)
+        (Math.abs(char.x - fixedMouthX) < 20 &&
+          Math.abs(char.y - fixedMouthY) < 20)
     )
     .map((remove) => {
       remove.remove = true;
@@ -241,7 +285,6 @@ function draw() {
   // const spinRad = spinDeg * (Math.PI / 180);
   const spinRad = petMoveAngle * (Math.PI / 180);
 
-  const petSizeWidth = 200;
   const petSizeHeight = petShape.imageRatio * petSizeWidth;
   // FIXME: remove
   // const petX = 50;
@@ -280,7 +323,7 @@ function draw() {
 
   ctx.save();
 
-  const scale = 1 + Math.log(petShapeAteMax - petShapeBaseMax + 1) / 25;
+  const scale = getPetScale();
 
   ctx.translate(petCenterX, petCenterY);
   ctx.scale(scale, scale);
@@ -383,6 +426,27 @@ function draw() {
 
   ctx.restore();
 
+  // const toDrawVals = {
+  //   nextPetMoveAccStamp,
+  //   petMoveAngleVel,
+  //   petMoveAngleAcc,
+  //   petMoveDistanceVel,
+  //   petMoveDistanceAcc,
+  //   petMoveAngle,
+  //   petMoveDistance,
+  //   petMoveAngleVelMax,
+  //   petMoveDistanceVelMax,
+  // };
+
+  // ctx.fillStyle = "#ffffff";
+  // ctx.font = "bold 13px sans-serif";
+
+  // let i = 0;
+  // for (const key in toDrawVals) {
+  //   ctx.fillText(`${key}: ${toDrawVals[key]}`, 100, 100 + i * 30);
+  //   i++;
+  // }
+
   ctx.restore();
 
   window.requestAnimationFrame(draw);
@@ -428,8 +492,11 @@ async function fetchClipboard() {
   }
 }
 
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+function getPetScale() {
+  return 1 + Math.log(petShapeAteMax - petShapeBaseMax + 1) / 25;
+}
 
+// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 // min and max are inclusive
 function getRandomInt(min, max) {
   const minCeiled = Math.ceil(min);
