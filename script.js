@@ -1,9 +1,6 @@
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
-// FIXME: remove
-// let spinDeg = 0;
-
 let petX = document.body.offsetWidth / 2;
 let petY = document.body.offsetHeight / 2;
 
@@ -92,7 +89,11 @@ document.addEventListener("mousemove", async (e) => {
 document.addEventListener("keydown", async (e) => {
   if (e.key === "v" && (e.ctrlkey || e.metaKey)) {
     e.preventDefault();
+
     await fetchClipboard();
+
+    if (clipboardItems.length === 0) return;
+
     await navigator.clipboard.writeText("");
 
     toEatSince = Date.now();
@@ -121,16 +122,6 @@ document.addEventListener("keydown", async (e) => {
 });
 
 function update() {
-  // TODO: improve update function, this is just an example
-  // TODO: delete
-  // spinDeg += 0.5;
-
-  // lastPetMoveAccStamp;
-  // petMoveAngleVel;
-  // petMoveAngleAcc;
-  // petMoveDistanceVel;
-  // petMoveDistanceAcc;
-
   if (nextPetMoveAccStamp <= Date.now()) {
     nextPetMoveAccStamp = Date.now() + 5000;
     petMoveAngleAcc = getRandomArbitrary(-0.4, 0.4);
@@ -146,15 +137,8 @@ function update() {
     petMoveDistanceVelMax
   );
 
-  // petMoveAngle += petMoveAngleVel;
-  // petMoveDistance += Math.min(
-  //   petMoveDistance + petMoveDistanceVel,
-  //   petMoveDistanceMax
-  // );
-
   petMoveAngle += petMoveAngleVel;
   petMoveDistance += petMoveDistanceVel;
-  // petMoveDistance = 1;
 
   const petMoveRad = petMoveAngle * (Math.PI / 180);
 
@@ -180,21 +164,12 @@ function update() {
   petX = Math.max(Math.min(petX, rightBoundary), leftBoundary);
   petY = Math.max(Math.min(petY, bottomBoundary), topBoundary);
 
-  if (Math.round(oldPetX) !== Math.round(petX)) console.log({ oldPetX, petX });
-  if (Math.round(oldPetY) !== Math.round(petY)) console.log({ oldPetY, petY });
-
-  // if (
-  //   Math.round(oldPetX) !== Math.round(petX) ||
-  //   Math.round(oldPetY) !== Math.round(petY)
-  // ) {
   if (oldPetX !== petX || oldPetY !== petY) {
-    // petMoveAngleAcc *= -1;
     petMoveAngleAcc += 180;
 
     petMoveAngleVel = 0;
     petMoveDistanceVel = 0;
 
-    // petMoveAngle = 0;
     petMoveDistance = 0;
   }
 
@@ -281,14 +256,9 @@ function draw() {
   const eyesFront = images.eyes_front;
   const mouth = images.mouth;
 
-  // FIXME: remove
-  // const spinRad = spinDeg * (Math.PI / 180);
   const spinRad = petMoveAngle * (Math.PI / 180);
 
   const petSizeHeight = petShape.imageRatio * petSizeWidth;
-  // FIXME: remove
-  // const petX = 50;
-  // const petY = 50;
 
   const petCenterX = petX + petSizeWidth / 2;
   const petCenterY = petY + petSizeHeight / 2;
@@ -454,15 +424,30 @@ function draw() {
 
 async function fetchClipboard() {
   lastFetch = Date.now();
-  const newClipboardText = (await navigator.clipboard.readText()) ?? "";
+
+  let newClipboardText;
+
+  try {
+    newClipboardText = (await navigator.clipboard.readText()) ?? "";
+  } catch (err) {
+    console.log(
+      "Could not fetch clipboard (check if the document is focused!)"
+    );
+    console.error(err);
+    return;
+  }
+
   if (clipboardText !== newClipboardText) {
     clipboardText = newClipboardText;
     const newItems = clipboardText.split("").filter((char) => char.trim());
-    if (newItems.length >= 1) {
-      newBubbleRadiusBefore = bubbleRadius;
-      newBubbleRadiusTime = Date.now();
-      newBubbleRadius = Math.min(25 + newItems.length / 10, bubbleRadiusMax);
-    }
+
+    newBubbleRadiusBefore = bubbleRadius;
+    newBubbleRadiusTime = Date.now();
+    newBubbleRadius =
+      newItems.length === 0
+        ? bubbleRadiusMin
+        : Math.min(25 + newItems.length / 10, bubbleRadiusMax);
+
     let totalSpinning = 0;
     clipboardItems = newItems.map((char) => {
       const angleRad = getRandomArbitrary(0, 360) * (180 / Math.PI);
