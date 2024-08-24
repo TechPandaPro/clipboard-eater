@@ -8,7 +8,7 @@ What is Clipboard Eater? Well... it eats your clipboard. Rather than explaining,
 
 You'll need to allow the page to access your clipboard. Once you do, try copying text from another window. When moving back to Clipboard Eater, you should see a "bubble" appear. Once you paste it (`Ctrl/Cmd + V`), the "pet" will eat all the text!
 
-As you feed text to your pet, it grows and changes shape/color.
+As you feed text to your pet, the pet grows and changes shape/color.
 
 ## Why?
 
